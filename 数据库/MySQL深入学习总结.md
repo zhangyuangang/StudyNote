@@ -13,7 +13,7 @@
 
 # **查询语句执行过程**
 
-![clipboard.png](/img/bVbxve2)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/1.png)
 
 ### **连接器**
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;第一步，连接器连接到数据库，连接器负责跟客户端建立连接、获取权限、维持和管理连接。
@@ -23,7 +23,7 @@
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;连接完成后，如果没有后续的动作，这个连接就处于空闲状态，可以在**show processlist**命令中看到它。文本中这个图是show processlist的结果，其中的Command列显示为"Sleep"的这一行，就表示现在系统里面有一个空闲连接。
 
-![clipboard.png](/img/bVbxve5)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/2.png)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数**wait timeout**控制的，默认值是8小时。
 
@@ -122,7 +122,7 @@
 > 在 InnoDB 中，innodb_flush_neighbors 参数就是用来控制这个行为的，值为 1 的时候会有“连坐”机制，值为 0 时表示不找邻居，自己刷自己的。固态硬盘建议设置为0。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;InnoDB 的 redo log 是可以配置的固定大小，比如可以配置为一组 4 个文件，每个文件的大小是 1GB，总共就可以记录 4GB 的操作。从头开始写，写到末尾就又回到开头循环写，如下面这个图所示。**如果redo log 设置的太小，磁盘压力很小，但是数据库出现间歇性的性能下跌。**
-![clipboard.png](/img/bVbxvfg)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/3.png)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;write pos 是当前记录的位置，一边写一边后移，写到第 3 号文件末尾后就回到 0 号文件开头。checkpoint 是当前要擦除的位置，也是往后推移并且循环的，擦除记录前要把记录更新到数据文件。
 
@@ -189,7 +189,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 5. **执行器调用引擎的提交事务接口，引擎把刚刚写入的 redo log 改成提交（commit）状态，更新完成。**
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;这里给出这个 update 语句的执行流程图，图中浅色框表示是在 InnoDB 内部执行的，深色框表示是在执行器中执行的。**其实就是把redo log 和binlog 做两阶段提交，为了让两份日志之间的逻辑一致。**
-![clipboard.png](/img/bVbxvfi)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/4.png)
 
 ### 备份恢复
 **保存一定时间的binlog，同时系统会定期做整库备份。**
@@ -210,7 +210,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 3. 主库 A 校验完用户名、密码后，开始按照备库 B 传过来的位置，从本地读取 binlog，发给 B。
 4. 备库 B 拿到 binlog 后，写到本地文件，称为中转日志（relay log）。
 5. sql_thread 读取中转日志，解析出日志里的命令，并执行。
-![clipboard.png](/img/bVbxvfj)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/5.png)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;一主一备结构，需要注意主备切换，备库设置只读，避免切换bug造成双写不一致问题（设置 readonly 对超级用户是无效的，同步更新的线程有超级权限，所以还能写入同步数据）。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;双主结构，要避免循环更新问题，因为MySQL 在 binlog 中记录了这个命令第一次执行时所在实例的 server id。所以可以规定两个库的 server id 必须不同，每个库在收到从自己的主库发过来的日志后，先判断 server id，如果跟自己的相同，表示这个日志是自己生成的，就直接丢弃这个日志。
@@ -261,7 +261,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 1. 客户端直连方案，因为少了一层 proxy 转发，所以查询性能稍微好一点儿，并且整体架构简单，排查问题更方便。但是这种方案，由于要了解后端部署细节，所以在出现主备切换、库迁移等作的时候，客户端都会感知到，并且需要调整数据库连接信息。 可能会觉得这样客户端也太麻烦了，信息大量冗余，架构很丑。其实也未必，一般采用这样的架构，一定会伴随一个负责管理后端的组件，比如 Zookeeper，尽量让业务端只专注于业务逻辑开发。
 2. 带 proxy 的架构，对客户端比较友好。客户端不需要关注后端细节，连接维护、后端信息维护等工作，都是由 proxy 完成的。但这样的话，对后端维护团队的要求会更高。而且，proxy 也需要有高可用架构。因此，带 proxy 架构的整体就相对比较复杂。
 
-​		**主从延迟的情况下怎么办？**
+**主从延迟的情况下怎么办？**
 
 1. 强制走主库方案；对于必须要拿到最新结果的请求，强制将其发到主库上。
 2. sleep 方案；主库更新后，读从库之前先 sleep 一下。因为大多数情况下主备延迟在 1 秒之内。
@@ -341,7 +341,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B+Tree叶结点上，始终存储的是最新的数据（可能是还未提交的数据）。而旧版本数据，通过UNDO记录存储在回滚段（Rollback Segment）里。每一条记录都会维护一个ROW HEADER元信息，存储有创建这条记录的事务ID，一个指向UNDO记录的指针。**通过最新记录和UNDO信息，可以还原出旧版本的记录。**
 
 假设一个值从 1 被按顺序改成了 2、3、4，在回滚日志里面就会有类似下面的记录。
-![clipboard.png](/img/bVbxvfn)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/6.png)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;当前值是 4，但是在查询这条记录的时候，不同时刻启动的事务会有不同的 read-view。同一条记录在系统中可以存在多个版本，就是数据库的多版本并发控制（MVCC）。对于 read-view A，要得到 1，就必须将当前值依次执行图中所有的回滚操作得到。这些回滚信息记录在undo log 里。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;当系统里没有比这个回滚日志更早的 read-view 的时候会删除老的undo log。
@@ -386,7 +386,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**非主键索引的叶子节点内容是主键的值。**在 InnoDB 里，非主键索引也被称为二级索引（secondary index）。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**查询语句，如果走主键索引，会直接得到数据，如果走非主键索引，查到主键后，还需要回主键索引再查一次数据。这个过程称为回表。（覆盖索引不需要回表）**
-![clipboard.png](/img/bVbxvfo)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/7.png)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;分为聚簇索引和非聚簇索引的原因：更新数据的时候，由于数据的地址变了，需要更改索引，但是由于数据只跟主键索引绑定，索引只需要更新聚簇索引，当然还有被更新列涉及到的索引也要更新。如果所有所有都跟数据绑定，虽然省掉了回表的过程，但是每次更新，需要更新所有的索引，得不偿失。
 
@@ -424,7 +424,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B+ 树这种索引结构，可以利用索引的“最左前缀”，来定位记录。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;为了直观地说明这个概念，用（name，age）这个联合索引来分析。
-![clipboard.png](/img/bVbxvfp)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/8.jpg)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;可以看到，索引项是按照索引定义里面出现的字段顺序排序的。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;当逻辑需求是查到所有名字是“张三”的人时，可以快速定位到 ID4，然后向后遍历得到所有需要的结果。
@@ -477,7 +477,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;在 MySQL 5.6 之前，只能从 ID3 开始一个个回表。到主键索引上找出数据行，再对比字段值。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**而 MySQL 5.6 引入的索引下推优化（index condition pushdown)，可以在索引遍历过程中，对索引中包含的字段先做判断，直接过滤掉不满足条件的记录，减少回表次数。**
-![clipboard.png](/img/bVbxvfw)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/9.jpg)
 
 ### **change buffer**
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;当需要更新一个数据页时，如果数据页在内存中就直接更新，而如果这个数据页还没有在内存中的话，在不影响数据一致性的前提下，InooDB 会将这些更新操作缓存在 change buffer 中，这样就不需要从磁盘中读入这个数据页了。在下次查询需要访问这个数据页的时候，将数据页读入内存，然后执行 change buffer 中与这个页有关的操作。通过这种方式就能保证这个数据逻辑的正确性。**虽然是只更新内存，但是在事务提交的时候，把 change buffer 的操作也记录到 redo log 里了，所以崩溃恢复的时候，change buffer 也能找回来。**
@@ -544,7 +544,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;这个统计信息就是索引的“区分度”。显然，一个索引上不同的值越多，这个索引的区分度就越好。而一个索引上不同的值的个数，称之为“基数”（cardinality）。也就是说，这个基数越大，索引的区分度越好。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**可以使用 show index 方法，看到一个索引的基数。**
-![clipboard.png](/img/bVbxvfx)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/10.png)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MySQL 采样统计的方法获得基数，InnoDB 默认会选择 N 个数据页，统计这些页面上的不同值，得到一个平均值，然后乘以这个索引的页面数，就得到了这个索引的基数。当变更的数据行数超过 1/M 的时候，会自动触发重新做一次索引统计。**analyze table t 命令，可以用来重新统计索引信息。**
 
@@ -556,7 +556,7 @@ write 和 fsync 的时机，是由参数 sync_binlog 控制的：
 
 其实索引统计只是一个输入，对于一个具体的语句来说，优化器还要判断，执行这个语句本身要扫描多少行。
 
-![clipboard.png](/img/bVbxvfy)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/11.png)
 rows 这个字段表示的是预计扫描行数。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;少数情况下优化器会选错索引，**第一种方法可以采用 force index 强行选择一个索引。**
@@ -655,7 +655,7 @@ rows 这个字段表示的是预计扫描行数。
 ### **死锁**
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;当并发系统中不同线程出现循环资源依赖，涉及的线程都在等待别的线程释放资源时，就会导致这几个线程都进入无限等待的状态，称为死锁。这里用数据库中的行锁举个例子。
-![clipboard.png](/img/bVbxvfA)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/12.png)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;这时候，事务 A 在等待事务 B 释放 id=2 的行锁，而事务 B 在等待事务 A 释放 id=1 的行锁。 事务 A 和事务 B 在互相等待对方的资源释放，就是进入了死锁状态。当出现死锁以后，有两种策略：
 
 - 一种策略是，直接进入等待，直到超时。这个超时时间可以通过参数 innodb_lock_wait_timeout 来设置。
@@ -669,7 +669,7 @@ rows 这个字段表示的是预计扫描行数。
 #### **慢SQL问题排查**
 
 使用 show processlist 命令查看 Waiting for table metadata lock 的示意图。
-![clipboard.png](/img/bVbxvfF)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/13.png)
 这个状态表示的是，现在有一个线程正在表 t 上请求或者持有 MDL 写锁，把 select 语句堵住了。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;通过查询 sys.schema_table_lock_waits 这张表，就可以直接找出造成阻塞的 process id，把这个连接用 kill 命令断开即可。
@@ -677,19 +677,19 @@ rows 这个字段表示的是预计扫描行数。
 通过 sys.innodb_lock_waits 查行锁
 
 > select * from t sys.innodb_lock_waits where locked_table=`'test'.'t'`\G
-> ![clipboard.png](/img/bVbxvfI)
+> ![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/14.png)
 > 这个信息很全，4 号线程是造成堵塞的罪魁祸首。而干掉这个罪魁祸首的方式，就是 KILL QUERY 4 或 KILL 4。实际上，这里 KILL 4 才有效。
 
 # **其他**
 
 ### **count(*) 语句分析**
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MyISAM 引擎把一个表的总行数存在了磁盘上，因此执行 count(*) 的时候会直接返回这个数，效率很高；
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MyISAM 引擎把一个表的总行数存在了磁盘上，因此执行 count(\*) 的时候会直接返回这个数，效率很高；
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;InnoDB 引擎就麻烦了，执行 count(*) 的时候，需要把数据一行一行地从引擎里面读出来，然后累积计数。因为多版本并发控制（MVCC）的原因，InnoDB 表“应该返回多少行”也是不确定的。
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;InnoDB 引擎就麻烦了，执行 count(\*) 的时候，需要把数据一行一行地从引擎里面读出来，然后累积计数。因为多版本并发控制（MVCC）的原因，InnoDB 表“应该返回多少行”也是不确定的。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count() 是一个聚合函数，对于返回的结果集，一行行地判断，如果 count 函数的参数不是 NULL，累计值就加 1，否则不加。最后返回累计值。
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;所以，count(*)、count(主键 id) 和 count(1) 都表示返回满足条件的结果集的总行数；而 count(字段），则表示返回满足条件的数据行里面，参数“字段”不为 NULL 的总个数。
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;所以，count(\*)、count(主键 id) 和 count(1) 都表示返回满足条件的结果集的总行数；而 count(字段），则表示返回满足条件的数据行里面，参数“字段”不为 NULL 的总个数。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**按照效率排序的话，count(字段) < count(主键id) < count(1) < count(\*)，所以建议，尽量使用count(\*)。**
 
@@ -709,7 +709,7 @@ rows 这个字段表示的是预计扫描行数。
 
 > select * from t1 straight_join t2 on (t1.a=t2.a);
 
-![clipboard.png](/img/bVbxvfJ)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/15.png)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;在这条语句里，**被驱动表 t2 的字段 a 上有索引，join 过程用上了这个索引，因此效率是很高的。称之为“Index Nested-Loop Join”，简称 NLJ。**
 
 ​&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**如果被驱动表 t2 的字段 a 上没有索引，那每次到 t2 去匹配的时候，就要做一次全表扫描。这个效率很低。这个算法叫做“Simple Nested-Loop Join”的算法，简称 BNL。**
@@ -722,7 +722,7 @@ rows 这个字段表示的是预计扫描行数。
 
 > select * from t1 where a>=1 and a<=100;
 
-![clipboard.png](/img/bVbxvfN)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/16.png)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Batched Key Access(BKA) 算法。这个 BKA 算法，其实就是对 NLJ 算法的优化。**
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NLJ 算法执行的逻辑是：从驱动表 t1，一行行地取出 a 的值，再到被驱动表 t2 去做 join。也就是说，对于表 t2 来说，每次都是匹配一个值。这时，MRR 的优势就用不上了。
@@ -731,7 +731,7 @@ rows 这个字段表示的是预计扫描行数。
 
 ### **自增主键**
 
-![clipboard.png](/img/bVbxvfO)
+![](https://raw.githubusercontent.com/zhangyuangang/StudyNote/master/res/mysql/17.png)
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;表定义里面出现了一个 AUTO_INCREMENT=2，表示下一次插入数据时，如果需要自动生成自增值，会生成 id=2。
 
 实际上，表的结构定义存放在后缀名为.frm 的文件中，但是并不会保存自增值。
@@ -802,9 +802,9 @@ rows 这个字段表示的是预计扫描行数。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**对于正在执行的事务，可以从 information_schema.innodb_trx 表中看到事务的 trx_id。**
 
-   > ​		update 和 delete 语句除了事务本身，还涉及到标记删除旧数据，也就是要把数据放到 purge 队列里等待后续物理删除，这个操作也会把 max_trx_id+1， 因此在一个事务中至少加 2；
+   > update 和 delete 语句除了事务本身，还涉及到标记删除旧数据，也就是要把数据放到 purge 队列里等待后续物理删除，这个操作也会把 max_trx_id+1， 因此在一个事务中至少加 2；
    >
-   > ​		InnoDB 的后台操作，比如表的索引信息统计这类操作，也是会启动内部事务的，因此你可能看到，trx_id 值并不是按照加 1 递增的。
+   > InnoDB 的后台操作，比如表的索引信息统计这类操作，也是会启动内部事务的，因此你可能看到，trx_id 值并不是按照加 1 递增的。
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**只读事务会分配一个特殊的，比较大的id，**把当前事务的 trx 变量的指针地址转成整数，再加上 2<sup>48</sup>，使用这个算法，就可以保证以下两点：
 
